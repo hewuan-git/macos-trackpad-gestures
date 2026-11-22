@@ -4,19 +4,31 @@
 
 在 macOS 上用触摸板多指手势控制音乐：左右滑切歌（上一首 / 下一首）、上下滑调音量、轻点播放/暂停。也就是"Windows 触摸板默认就会、Mac 上要找第三方工具"的那套动作。
 
-一个 C 文件，零依赖：只需要命令行工具里的 clang（`xcode-select --install`），不需要完整 Xcode、不需要 Homebrew、不需要任何常驻 GUI App。编译出来是个 70 KB 的裸二进制，注册成登录自启的 LaunchAgent。
+一个 C 文件，零依赖：只需要命令行工具里的 clang（`xcode-select --install`），不需要完整 Xcode、不需要任何常驻 GUI App。编译出来是个 70 KB 的裸二进制，注册成登录自启的 LaunchAgent。装法两条：clone 下来跑一条 `install.sh`，或者交给 Homebrew 用 `brew install`。
 
-仓库名是 `macos-trackpad-gestures`（GitHub 的仓库名只收 ASCII，所以用英文关键词，方便别人搜到）；程序、命令和二进制仍叫 `trackpad-media`。
+仓库名是 `macos-trackpad-gestures`（GitHub 的仓库名只收 ASCII，所以用英文关键词，方便别人搜到）；程序、命令、二进制和 Homebrew 的 formula 都仍叫 `trackpad-media`。
 
 ## 三步跑起来
 
 ```sh
-git clone https://github.com/hewuan-git/macos-trackpad-gestures.git && cd trackpad-media
-./install.sh none key 0.10 3 on      # 闸门 / 切歌 / 行程 / 几指 / 轻点，含义见下面「安装」
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"   # 手动授权一次
+brew tap hewuan-git/tap && brew install trackpad-media
+trackpad-media-setup none key 0.10 3 on     # 闸门 / 切歌 / 行程 / 几指 / 轻点，含义见下面「安装」
 ```
 
-第 3 步只是把设置页打开，开关还得你自己拨——Apple 不允许任何安装器预先拿到媒体键权限（详见下文「必须手动授权一次」）。**调音量不需要授权**，所以就算还没授权，上下滑已经能用了，只是左右滑和轻点没反应。
+不想装 Homebrew 就 clone：
+
+```sh
+git clone https://github.com/hewuan-git/macos-trackpad-gestures.git && cd trackpad-media
+./install.sh none key 0.10 3 on
+```
+
+最后手动授权一次（这一步只是把设置页打开）：
+
+```sh
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+```
+
+开关还得你自己拨——Apple 不允许任何安装器预先拿到媒体键权限（详见下文「必须手动授权一次」）。**调音量不需要授权**，所以就算还没授权，上下滑已经能用了，只是左右滑和轻点没反应。
 
 上手前请先看「一定要先把系统手势挪开」，这是最容易踩的坑。
 
@@ -70,6 +82,23 @@ killall Dock
 
 ## 安装
 
+### 用 Homebrew
+
+```sh
+brew tap hewuan-git/tap
+brew install trackpad-media
+trackpad-media-setup none key 0.10 3 on
+```
+
+formula 把 `main.c` 编成 Homebrew 目录下的 `TrackpadMedia.app`、ad-hoc 签好名，`trackpad-media-setup` 再写同一个 LaunchAgent。程序、五个参数、日志位置全都一样；`trackpad-media-setup --off` 停掉。
+
+走 Homebrew 有两点要留意：
+
+- `brew upgrade` 会重新编译，ad-hoc 签名绑的是二进制内容，所以升级之后原来那条授权就失效了：删掉旧条目重新加一次（`tccutil reset Accessibility com.local.trackpad-media` 可以清掉）。
+- formula 钉在打 tag 的版本上，`brew` 装的是发布版，不是最新一次提交。tap 的源码在 [hewuan-git/homebrew-tap](https://github.com/hewuan-git/homebrew-tap)。
+
+### 从源码
+
 ```sh
 git clone https://github.com/hewuan-git/macos-trackpad-gestures.git
 cd trackpad-media
@@ -86,7 +115,7 @@ cd trackpad-media
 | 几指 | `2`~`5` | `3` | 用几根手指，要和系统手势错开 |
 | 轻点 | `on` / `off` | `on` | 多指轻点是否等于播放/暂停 |
 
-调手感就是重跑一次 `install.sh`。**源码没变时 `install.sh` 不重新编译、不重新签名**，所以调参数不会弄坏你已经给过的授权。
+调手感就是重跑一次 `install.sh`（用 Homebrew 装的就重跑 `trackpad-media-setup`）。**源码没变时 `install.sh` 不重新编译、不重新签名**，所以调参数不会弄坏你已经给过的授权。
 
 不传参数时用的是上表的默认值（闸门 `audio`、三指）。二进制自己的完整参数和 `--check` / `--watch` / `--test` 这些调试模式，`./trackpad-media --help` 都能查到。
 
@@ -95,7 +124,7 @@ cd trackpad-media
 切歌和播放/暂停要模拟硬件按键，需要「设备控制和数据访问」（旧系统叫辅助功能）授权。Apple 不允许任何安装器预先拿到它，后台进程连授权弹窗都弹不出来，所以每台机器都要手动加一次：
 
 1. 打开这一页：系统设置 → 隐私与安全性 → 设备控制和数据访问（或者 `open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"`）
-2. 程序每次启动都会向系统登记一次，列表里一般能直接看到 **Trackpad Media**（带空格、有 App 图标），把开关拨到开就行；看不到就点 **+**，在文件选择框里按 **⇧⌘G**，粘贴 `~/Library/Application Support/trackpad-media/TrackpadMedia.app`。要是列表里还有一个全小写的 `trackpad-media`，那是早期版本留下的裸二进制，拨它没用，选中按 **−** 删掉。
+2. 程序每次启动都会向系统登记一次，列表里一般能直接看到 **Trackpad Media**（带空格、有 App 图标），把开关拨到开就行；看不到就点 **+**，在文件选择框里按 **⇧⌘G**，粘贴 `~/Library/Application Support/trackpad-media/TrackpadMedia.app`（用 Homebrew 装的话是 `$(brew --prefix trackpad-media)/TrackpadMedia.app`）。要是列表里还有一个全小写的 `trackpad-media`，那是早期版本留下的裸二进制，拨它没用，选中按 **−** 删掉。
 3. **拨完开关要重启一次进程**，否则程序仍然按旧状态判定：实测开关拨开之后立刻查，报的还是"状态 1（拒绝）"，`launchctl kickstart -k gui/$(id -u)/com.user.trackpad-media` 之后马上就好了。
 4. 验证：等两秒，`kill -USR1 <pid>`（pid 用 `pgrep -f TrackpadMedia.app` 拿），日志里出现 `自检通过：音量 x -> y（已还原）` 就成了
 
@@ -134,10 +163,11 @@ clang -O2 -fblocks -Wall -Wno-deprecated-declarations -o trackpad-media main.c \
 ## 停止 / 卸载
 
 ```sh
-./stop.sh
+./stop.sh                      # 从源码装的
+trackpad-media-setup --off     # 用 Homebrew 装的
 ```
 
-只停止并取消自启，程序、plist、日志都保留（plist 改名为 `.disabled`）。脚本会打印一行恢复命令。想彻底删：
+只停止并取消自启，程序、plist、日志都保留（plist 改名为 `.disabled`）。脚本会打印一行恢复命令。Homebrew 装的还要 `brew uninstall trackpad-media` 才会把二进制拿掉——先停服务再卸载，否则 launchd 会继续抱着一个已经删掉的文件跑。想彻底删（源码版）：
 
 ```sh
 ./stop.sh

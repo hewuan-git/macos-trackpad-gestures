@@ -4,19 +4,31 @@
 
 Looking for a **trackpad gesture to switch songs on macOS** — skip to the next / previous track, turn the volume up and down, play/pause — without lifting your fingers off the pad? That's what this does: multi-finger sideways swipe = previous / next track, vertical swipe = volume, tap = play / pause. The gestures Windows Precision Touchpads have out of the box, on a Mac.
 
-One C file, zero dependencies. All you need is the `clang` that ships with the Command Line Tools (`xcode-select --install`) — no full Xcode, no Homebrew, no GUI app left running in the menu bar. It builds into a 70 KB binary that registers itself as a LaunchAgent and starts at login.
+One C file, zero dependencies. All you need is the `clang` that ships with the Command Line Tools (`xcode-select --install`) — no full Xcode, no GUI app left running in the menu bar. It builds into a 70 KB binary that registers itself as a LaunchAgent and starts at login. Two ways in: clone the repo and run one `install.sh`, or let Homebrew own the binary with `brew install`.
 
-The repo is named `macos-trackpad-gestures` because GitHub only accepts ASCII in repo names and the English keywords are what people actually search for; the program, the command and the binary are all still called `trackpad-media`. The program's log and its own messages are in Chinese — this file is the English version of [README.zh-CN.md](README.zh-CN.md).
+The repo is named `macos-trackpad-gestures` because GitHub only accepts ASCII in repo names and the English keywords are what people actually search for; the program, the command and the binary are all still called `trackpad-media`. The Homebrew formula is `trackpad-media` too. The program's log and its own messages are in Chinese — this file is the English version of [README.zh-CN.md](README.zh-CN.md).
 
 ## Quick start
 
 ```sh
-git clone https://github.com/hewuan-git/macos-trackpad-gestures.git && cd trackpad-media
-./install.sh none key 0.10 3 on      # gate / track / travel / fingers / tap — see "Install" below
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"   # grant it once, by hand
+brew tap hewuan-git/tap && brew install trackpad-media
+trackpad-media-setup none key 0.10 3 on     # gate / track / travel / fingers / tap — see "Install" below
 ```
 
-Step 3 only opens the settings page; you still have to flip the switch yourself — Apple does not let any installer pre-grant media-key access (see "One permission you must grant by hand"). **Volume needs no permission at all**, so even before granting, up/down swipes already work; only sideways swipes and taps are dead.
+No Homebrew? Clone instead:
+
+```sh
+git clone https://github.com/hewuan-git/macos-trackpad-gestures.git && cd trackpad-media
+./install.sh none key 0.10 3 on
+```
+
+Then grant the permission once, by hand:
+
+```sh
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+```
+
+That last step only opens the settings page; you still have to flip the switch yourself — Apple does not let any installer pre-grant media-key access (see "One permission you must grant by hand"). **Volume needs no permission at all**, so even before granting, up/down swipes already work; only sideways swipes and taps are dead.
 
 Read "Move the system gestures out of the way first" before you try anything — it is the easiest thing to get wrong.
 
@@ -70,6 +82,23 @@ killall Dock
 
 ## Install
 
+### With Homebrew
+
+```sh
+brew tap hewuan-git/tap
+brew install trackpad-media
+trackpad-media-setup none key 0.10 3 on
+```
+
+The formula compiles `main.c` into a `TrackpadMedia.app` under Homebrew's prefix, ad-hoc signs it, and `trackpad-media-setup` writes the same LaunchAgent from there. Same program, same five arguments, same log file. Stop it with `trackpad-media-setup --off`.
+
+Two things that are specific to the Homebrew route:
+
+- `brew upgrade` recompiles, and an ad-hoc signature is bound to the binary's bytes, so the permission entry dies. After an upgrade, delete the entry and add it again (`tccutil reset Accessibility com.local.trackpad-media` clears it).
+- The formula pins a tagged release, so `brew` installs a released version rather than whatever the last commit was. Tap source: [hewuan-git/homebrew-tap](https://github.com/hewuan-git/homebrew-tap).
+
+### From source
+
 ```sh
 git clone https://github.com/hewuan-git/macos-trackpad-gestures.git
 cd trackpad-media
@@ -86,7 +115,7 @@ The five positional arguments, in order:
 | fingers | `2`~`5` | `3` | How many fingers to use — must not collide with the system's slot |
 | tap | `on` / `off` | `on` | Whether an N-finger tap means play/pause |
 
-Tuning the feel means re-running `install.sh`. **If the source hasn't changed, `install.sh` neither recompiles nor re-signs**, so changing parameters cannot break the permission you already granted.
+Tuning the feel means re-running `install.sh` — or `trackpad-media-setup`, if you installed with Homebrew. **If the source hasn't changed, `install.sh` neither recompiles nor re-signs**, so changing parameters cannot break the permission you already granted.
 
 With no arguments you get the defaults in the table above (gate `audio`, three fingers). Every flag of the binary itself, plus the debug modes `--check` / `--watch` / `--test`, is listed by `./trackpad-media --help`.
 
@@ -95,7 +124,7 @@ With no arguments you get the defaults in the table above (gate `audio`, three f
 Track switching and play/pause synthesize hardware key presses, which need the "Device and Data Access" permission (called Accessibility on older systems). Apple forbids any installer from obtaining it in advance, and a background process cannot even raise the prompt, so it must be added manually on every machine:
 
 1. Open System Settings → Privacy & Security → Device and Data Access (or run `open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"`).
-2. The program registers itself with the system on every launch, so the list usually already shows **Trackpad Media** (with a space, with an app icon) — just flip it on. If it isn't there, click **+**, press **⇧⌘G** in the file panel and paste `~/Library/Application Support/trackpad-media/TrackpadMedia.app`. If the list also contains an all-lowercase `trackpad-media`, that is a leftover from an early version's bare binary — switching it does nothing, select it and press **−** to remove it.
+2. The program registers itself with the system on every launch, so the list usually already shows **Trackpad Media** (with a space, with an app icon) — just flip it on. If it isn't there, click **+**, press **⇧⌘G** in the file panel and paste `~/Library/Application Support/trackpad-media/TrackpadMedia.app` — or, if you installed with Homebrew, `$(brew --prefix trackpad-media)/TrackpadMedia.app`. If the list also contains an all-lowercase `trackpad-media`, that is a leftover from an early version's bare binary — switching it does nothing, select it and press **−** to remove it.
 3. **After flipping the switch, restart the process once**, otherwise the program keeps judging by the old state. Measured: checking immediately after flipping it still reports "status 1 (denied)"; after `launchctl kickstart -k gui/$(id -u)/com.user.trackpad-media` it works right away.
 4. Verify: wait two seconds, then `kill -USR1 <pid>` (get the pid with `pgrep -f TrackpadMedia.app`). The log line `自检通过：音量 x -> y（已还原）` ("self-test passed: volume restored") means you are done.
 
@@ -134,10 +163,11 @@ If watch mode shows left/right or up/down inverted, fix the direction checks in 
 ## Stop / uninstall
 
 ```sh
-./stop.sh
+./stop.sh                      # if you installed from source
+trackpad-media-setup --off     # if you installed with Homebrew
 ```
 
-This only stops the service and disables autostart; the program, the plist and the log are all kept (the plist is renamed to `.disabled`). The script prints a one-line restore command. To remove everything:
+This only stops the service and disables autostart; the program, the plist and the log are all kept (the plist is renamed to `.disabled`). The script prints a one-line restore command. With Homebrew, run `brew uninstall trackpad-media` afterwards to drop the binary — stop the service first, or launchd keeps running a deleted file. To remove everything (source install):
 
 ```sh
 ./stop.sh
