@@ -11,7 +11,7 @@
 ## 三步跑起来
 
 ```sh
-git clone <本仓库地址> && cd trackpad-media
+git clone https://github.com/hewuan-git/trackpad-media.git && cd trackpad-media
 ./install.sh none key 0.10 3 on      # 闸门 / 切歌 / 行程 / 几指 / 轻点，含义见下面「安装」
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"   # 手动授权一次
 ```
@@ -62,7 +62,7 @@ killall Dock
 ## 安装
 
 ```sh
-git clone <本仓库地址>
+git clone https://github.com/hewuan-git/trackpad-media.git
 cd trackpad-media
 ./install.sh none key 0.10 3 on
 ```

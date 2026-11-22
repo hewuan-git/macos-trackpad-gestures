@@ -11,7 +11,7 @@ The program's log and its own messages are in Chinese; this file is the English 
 ## Quick start
 
 ```sh
-git clone <this repo's URL> && cd trackpad-media
+git clone https://github.com/hewuan-git/trackpad-media.git && cd trackpad-media
 ./install.sh none key 0.10 3 on      # gate / track / travel / fingers / tap — see "Install" below
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"   # grant it once, by hand
 ```
@@ -62,7 +62,7 @@ killall Dock
 ## Install
 
 ```sh
-git clone <this repo's URL>
+git clone https://github.com/hewuan-git/trackpad-media.git
 cd trackpad-media
 ./install.sh none key 0.10 3 on
 ```
