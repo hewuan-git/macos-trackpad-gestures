@@ -1,0 +1,6 @@
+# 本地编译产物，install.sh 真正的产物在 ~/Library/Application Support/trackpad-media
+/trackpad-media
+*.o
+*.log
+build.stamp
+.DS_Store
