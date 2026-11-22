@@ -2,16 +2,16 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-Control music playback and volume with multi-finger trackpad gestures on macOS: swipe sideways for previous / next track, swipe up and down for volume, tap for play / pause.
+Looking for a **trackpad gesture to switch songs on macOS** — skip to the next / previous track, turn the volume up and down, play/pause — without lifting your fingers off the pad? That's what this does: multi-finger sideways swipe = previous / next track, vertical swipe = volume, tap = play / pause. The gestures Windows Precision Touchpads have out of the box, on a Mac.
 
 One C file, zero dependencies. All you need is the `clang` that ships with the Command Line Tools (`xcode-select --install`) — no full Xcode, no Homebrew, no GUI app left running in the menu bar. It builds into a 70 KB binary that registers itself as a LaunchAgent and starts at login.
 
-The program's log and its own messages are in Chinese; this file is the English version of [README.zh-CN.md](README.zh-CN.md).
+The repo is named `macos-trackpad-gestures` because GitHub only accepts ASCII in repo names and the English keywords are what people actually search for; the program, the command and the binary are all still called `trackpad-media`. The program's log and its own messages are in Chinese — this file is the English version of [README.zh-CN.md](README.zh-CN.md).
 
 ## Quick start
 
 ```sh
-git clone https://github.com/hewuan-git/trackpad-media.git && cd trackpad-media
+git clone https://github.com/hewuan-git/macos-trackpad-gestures.git && cd trackpad-media
 ./install.sh none key 0.10 3 on      # gate / track / travel / fingers / tap — see "Install" below
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"   # grant it once, by hand
 ```
@@ -23,6 +23,15 @@ Read "Move the system gestures out of the way first" before you try anything —
 ## Why write this at all
 
 On Windows these gestures come with the machine: Precision Touchpad and the ASUS / Lenovo vendor drivers ship multi-finger sideways swipe for track switching, vertical swipe for volume, and a tap for play/pause (the finger count and directions differ by vendor). Coming back to macOS feels clumsy: the system only offers window gestures — "three/four-finger swipe to switch full-screen apps, Mission Control" — and media control is left to third-party tools. The ones I tried were either paid, or insisted on keeping a GUI app running, or needed a Lua runtime. None of them fit, so I wrote this.
+
+### How it differs from what's already out there
+
+| Option | What you'd have to install | Why I didn't use it |
+|---|---|---|
+| Built-in macOS trackpad gestures | nothing | Only window gestures (Mission Control, switch full-screen apps); there is no media gesture and no way to remap one |
+| Paid gesture apps (BetterTouchTool and friends) | a GUI app that stays running | Too heavy a thing to keep around just for skipping tracks and setting volume |
+| Scripting tools (Hammerspoon and friends) | a Lua runtime + an app that stays running | Doable, but installing a whole runtime for three fingers didn't feel worth it |
+| **This project** | only the `clang` in the Command Line Tools | A 70 KB binary and one LaunchAgent; nothing with a window |
 
 ## Gestures
 
@@ -62,7 +71,7 @@ killall Dock
 ## Install
 
 ```sh
-git clone https://github.com/hewuan-git/trackpad-media.git
+git clone https://github.com/hewuan-git/macos-trackpad-gestures.git
 cd trackpad-media
 ./install.sh none key 0.10 3 on
 ```

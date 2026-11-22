@@ -2,16 +2,16 @@
 
 **简体中文** · [English](README.md)
 
-在 macOS 上用触摸板多指手势控制媒体播放和音量：左右滑切歌、上下滑调音量、轻点播放/暂停。
+在 macOS 上用触摸板多指手势控制音乐：左右滑切歌（上一首 / 下一首）、上下滑调音量、轻点播放/暂停。也就是"Windows 触摸板默认就会、Mac 上要找第三方工具"的那套动作。
 
 一个 C 文件，零依赖：只需要命令行工具里的 clang（`xcode-select --install`），不需要完整 Xcode、不需要 Homebrew、不需要任何常驻 GUI App。编译出来是个 70 KB 的裸二进制，注册成登录自启的 LaunchAgent。
 
-仓库地址和命令都还叫 `trackpad-media`——GitHub 的仓库名只收 ASCII 字符，所以中文项目名写在这里和仓库的 About 里。
+仓库名是 `macos-trackpad-gestures`（GitHub 的仓库名只收 ASCII，所以用英文关键词，方便别人搜到）；程序、命令和二进制仍叫 `trackpad-media`。
 
 ## 三步跑起来
 
 ```sh
-git clone https://github.com/hewuan-git/trackpad-media.git && cd trackpad-media
+git clone https://github.com/hewuan-git/macos-trackpad-gestures.git && cd trackpad-media
 ./install.sh none key 0.10 3 on      # 闸门 / 切歌 / 行程 / 几指 / 轻点，含义见下面「安装」
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"   # 手动授权一次
 ```
@@ -23,6 +23,15 @@ open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibil
 ## 为什么自己写
 
 Windows 上这套手势是现成的——精确式触摸板和 ASUS / Lenovo 这类厂商驱动里，多指左右滑切歌、上下滑调音量、点一下播放暂停都默认就有（各家默认指头数和方向不完全一样），用惯了回到 Mac 上就很别扭。Mac 端系统只提供"三指/四指轻扫切换全屏 App、调度中心"这类窗口手势，媒体控制得靠第三方；试过的几个要么收费、要么得挂一个带界面的 App、要么要装 Lua 运行时，都不合用，就自己写了一个。
+
+### 和现成方案的区别
+
+| 方案 | 要额外装什么 | 我没选它的原因 |
+|---|---|---|
+| macOS 自带的触摸板手势 | 无 | 只有窗口类手势（切换全屏 App、调度中心），没有媒体类手势，也改不成媒体 |
+| 收费手势工具（BetterTouchTool 这类） | 一个常驻的图形界面 App | 只为切歌调音量挂一个带界面的 App，太重 |
+| 脚本类工具（Hammerspoon 这类） | Lua 运行时 + 常驻 App | 能写，但为了三根手指装一整套运行时不划算 |
+| **本项目** | 只有命令行里的 clang | 70 KB 裸二进制 + 一个 LaunchAgent，没有界面、没有常驻进程以外的东西 |
 
 ## 手势
 
@@ -62,7 +71,7 @@ killall Dock
 ## 安装
 
 ```sh
-git clone https://github.com/hewuan-git/trackpad-media.git
+git clone https://github.com/hewuan-git/macos-trackpad-gestures.git
 cd trackpad-media
 ./install.sh none key 0.10 3 on
 ```
