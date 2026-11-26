@@ -156,7 +156,12 @@ If watch mode shows left/right or up/down inverted, fix the direction checks in 
   rm ~/Library/Application\ Support/trackpad-media/run.log
   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.trackpad-media.plist
   ```
-- **Remote self-test**: `kill -USR1 <pid>` sends one "volume down" and restores it, which is an objective way to confirm the media key actually goes out; `kill -USR2 <pid>` rotates the gate.
+- **Remote self-test**: `kill -USR1 <pid>` sends one "volume down" and restores it, which is an objective way to confirm the media key actually goes out; `kill -USR2 <pid>` rotates the gate; `kill -WINCH <pid>` re-subscribes to the trackpad without restarting the process (no permission reset either).
+- **Gestures died after sleep**: this was a real bug for a long-running daemon — after a sleep/wake cycle the process stayed alive and still had its permission, but the touchpad subscription went mute, so every gesture was silently ignored. Since v1.1 the daemon listens for `kIOMessageSystemHasPoweredOn` on `IOPMrootDomain` and re-enumerates + re-subscribes every second until contact frames arrive again. If you are on an older build, one restart fixes it and keeps the permission:
+  ```sh
+  launchctl kickstart -k gui/$(id -u)/com.user.trackpad-media
+  ```
+  Check with `tail ~/Library/Application\ Support/trackpad-media/run.log`: a gesture that works writes a line, so "no lines at all while swiping" means the subscription is dead, not the permission.
 - **NetEase Cloud Music ignores MediaRemote**: while it is making sound, the system's `NowPlaying` is still empty — hence the default of emulated hardware media keys (`--track key`). With `--track mr` this kind of app simply won't react.
 - **How `--gate audio` decides "making sound"**: it reads CoreAudio's process object list and checks, per process, whether audio is being pushed to the output device. Don't use `kAudioDevicePropertyDeviceIsRunningSomewhere` — that returns true for anything merely holding the output device, idle included.
 

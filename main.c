@@ -19,6 +19,7 @@
 #include <dispatch/dispatch.h>
 #include <dlfcn.h>
 #include <IOKit/IOKitLib.h>
+#include <IOKit/IOMessage.h>
 #include <IOKit/hidsystem/IOHIDLib.h>
 #include <IOKit/hidsystem/IOLLEvent.h>
 #include <IOKit/hidsystem/ev_keymap.h>
@@ -397,6 +398,9 @@ static struct {
     double t0, tEnd;    /* 凑够手指数的时刻、最后一次还凑够的时刻 */
 } g;
 
+/* 最后一次收到手指数据的时刻，唤醒后靠它判断订阅是否真的活过来了 */
+static volatile CFAbsoluteTime gTouchAt;
+
 static void blockedNote(const char *what) {
     if (g.blockLogged) return;
     g.blockLogged = 1;
@@ -450,6 +454,7 @@ static void endGesture(void) {
 
 static void onContact(MTDeviceRef dev, void *fingers, int n, double ts, int frame) {
     (void)dev; (void)ts; (void)frame;
+    gTouchAt = CFAbsoluteTimeGetCurrent();
     double cx, cy;
 
     if (n > 0) {
@@ -512,26 +517,102 @@ static void onContact(MTDeviceRef dev, void *fingers, int n, double ts, int fram
 /* ================= 主循环 ================= */
 
 static MTDeviceRef gDevice;
+static MTCreateListFn pCreateList;
+static MTRegisterFn pRegister;
+static MTStartFn pStart;
 static MTStopFn pStop;
-/* MTDeviceCreateList 是 Create 规则，数组持有设备对象；提前释放会让 gDevice 变成野指针，
-   所以这份只活一次的分配故意不回收 */
+/* MTDeviceCreateList 按 Create 规则返回，数组自己持有设备对象。换列表时先把新的拿到手、
+   停掉旧设备，最后才 CFRelease 旧数组，不然 gDevice 会有一瞬间是野指针 */
 static CFArrayRef gDeviceList;
 
 /* 用信号远程操作正在运行的守护进程，这样测试是在它自己的授权身份下做的：
- *   SIGUSR1 = 跑一次媒体键自检（会短暂降一格音量再还原）
- *   SIGUSR2 = 轮换闸门判定方式 */
+ *   SIGUSR1  = 跑一次媒体键自检（会短暂降一格音量再还原）
+ *   SIGUSR2  = 轮换闸门判定方式
+ *   SIGWINCH = 当作刚睡醒，重新订阅一次触摸板（失灵时不用重启进程，也不会作废授权） */
 static volatile sig_atomic_t wantSelfTest;
 static volatile sig_atomic_t wantGateCycle;
+static volatile sig_atomic_t wantReopen;
 
 static void onUsr(int sig) {
     if (sig == SIGUSR1) wantSelfTest = 1;
-    else wantGateCycle = 1;
+    else if (sig == SIGUSR2) wantGateCycle = 1;
+    else wantReopen = 1;
+}
+
+/* ================= 睡眠唤醒 ================= */
+
+/* 睡一觉回来，MTDeviceStart 那份订阅就成了空壳：进程活着、权限还在，但再也收不到手指数据。
+   实测 11-22 装好的那版连续跑了 3 天 23 小时不报错，日志却停在最后一次唤醒之前，
+   用户只会觉得"手势突然坏了"。所以收到"系统已上电"就重新枚举、重新订阅，
+   并且一秒试一次，直到真的又收到手指数据。 */
+
+static CFAbsoluteTime gWakeAt;            /* 最后一次收到"系统已上电" */
+static int gReopenTries;
+static IONotificationPortRef gPwrPort;
+static io_object_t gPwrNotify;
+
+static void reopenTouch(int tryNo) {
+    if (!gDevice || !pStart) return;
+    if (pStop) pStop(gDevice);
+    CFArrayRef old = gDeviceList;
+    CFArrayRef list = pCreateList ? (CFArrayRef)pCreateList() : NULL;
+    if (!list || CFArrayGetCount(list) == 0) {
+        if (list) CFRelease(list);
+        pStart(gDevice, 0);            /* 设备这会儿还没回来，先把老的那份接上 */
+        if (tryNo == 1) logmsg("唤醒后暂时枚举不到触摸板，接下来几秒继续试");
+        return;
+    }
+    MTDeviceRef dev = (MTDeviceRef)CFArrayGetValueAtIndex(list, 0);
+    if (pRegister) pRegister(dev, onContact);
+    gDevice = dev;
+    gDeviceList = list;
+    pStart(dev, 0);
+    if (old) CFRelease(old);
+}
+
+static void powerChanged(void *ctx, io_service_t svc, natural_t msg, void *arg) {
+    (void)ctx; (void)svc; (void)arg;
+    if (msg != kIOMessageSystemHasPoweredOn) return;
+    gWakeAt = CFAbsoluteTimeGetCurrent();
+    gReopenTries = 0;
+    logmsg("系统已唤醒，正在重新订阅触摸板");
+}
+
+static void watchWakeup(void) {
+    io_service_t root = IOServiceGetMatchingService(kIOMainPortDefault,
+                                                   IOServiceMatching("IOPMrootDomain"));
+    if (!root) { logmsg("拿不到 IOPMrootDomain，睡眠唤醒后得自己重启进程"); return; }
+    gPwrPort = IONotificationPortCreate(kIOMainPortDefault);
+    if (!gPwrPort) { IOObjectRelease(root); logmsg("建通知端口失败，唤醒后得自己重启进程"); return; }
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), IONotificationPortGetRunLoopSource(gPwrPort),
+                       kCFRunLoopDefaultMode);
+    kern_return_t kr = IOServiceAddInterestNotification(gPwrPort, root, kIOGeneralInterest,
+                                                        powerChanged, NULL, &gPwrNotify);
+    if (kr != KERN_SUCCESS) logmsg("订阅唤醒事件失败（kr=%d），睡眠唤醒后得自己重启进程", kr);
+    IOObjectRelease(root);   /* 订阅自己留了一份引用 */
 }
 
 static void onTimer(CFRunLoopTimerRef t, void *ctx) {
     (void)t; (void)ctx;
     refreshPlaying();
     refreshClient();
+    if (wantReopen) {
+        wantReopen = 0;
+        gWakeAt = CFAbsoluteTimeGetCurrent();
+        gReopenTries = 0;
+        logmsg("手动触发重新订阅触摸板");
+    }
+    if (gWakeAt > 0) {
+        if (gTouchAt >= gWakeAt) {
+            logmsg("触摸板数据已恢复（重订阅 %d 次）", gReopenTries);
+            gWakeAt = 0;
+        } else if (gReopenTries >= 8) {
+            logmsg("重订阅 %d 次都没等到手指数据，可以先 kickstart 重启进程", gReopenTries);
+            gWakeAt = 0;
+        } else {
+            reopenTouch(++gReopenTries);
+        }
+    }
     if (wantSelfTest) { wantSelfTest = 0; mediaKeySelfTest(); }
     if (wantGateCycle) {
         wantGateCycle = 0;
@@ -552,6 +633,9 @@ static int startDaemon(int secs) {
     MTCreateListFn createList = (MTCreateListFn)dlsym(h, "MTDeviceCreateList");
     MTRegisterFn reg = (MTRegisterFn)dlsym(h, "MTRegisterContactFrameCallback");
     MTStartFn start = (MTStartFn)dlsym(h, "MTDeviceStart");
+    pCreateList = createList;
+    pRegister = reg;
+    pStart = start;
     pStop = (MTStopFn)dlsym(h, "MTDeviceStop");
     if (!createList || !reg || !start) { logmsg("MultitouchSupport 符号缺失，这个系统版本用不了"); return 0; }
 
@@ -570,6 +654,7 @@ static int startDaemon(int secs) {
     signal(SIGTERM, cleanup);
     signal(SIGUSR1, onUsr);
     signal(SIGUSR2, onUsr);
+    signal(SIGWINCH, onUsr);
 
     CFRunLoopTimerRef timer = CFRunLoopTimerCreate(NULL, CFAbsoluteTimeGetCurrent(), 1.0, 0, 0, onTimer, NULL);
     CFRunLoopAddTimer(CFRunLoopGetCurrent(), timer, kCFRunLoopDefaultMode);
@@ -579,6 +664,8 @@ static int startDaemon(int secs) {
            getpid(), wantFingers, swipeMin, wantFingers, wantFingers,
            tapEnabled ? "播放/暂停" : "不管（--tap off）", gateLabel(),
            trackVia == 0 ? "只用 MediaRemote" : trackVia == 2 ? "两者都发" : "只用硬件媒体键");
+    watchWakeup();
+    gTouchAt = CFAbsoluteTimeGetCurrent();
     start(gDevice, 0);
     if (secs > 0) CFRunLoopRunInMode(kCFRunLoopDefaultMode, secs, false);
     else CFRunLoopRun();
@@ -593,7 +680,8 @@ static void usage(FILE *f) {
                "  --watch [秒]  观察模式：只打印手势判定的中间量，不发消息\n"
                "  --test X  立刻发一次 X 然后退出，用来单独验证某条通路\n"
                "  --run     常驻运行（LaunchAgent 用的就是这个）\n"
-               "运行中还可用信号远程操作：kill -USR1 <pid> 跑媒体键自检，kill -USR2 <pid> 换闸门\n");
+               "运行中还可用信号远程操作：kill -USR1 <pid> 跑媒体键自检，kill -USR2 <pid> 换闸门，"
+               "kill -WINCH <pid> 重新订阅触摸板（睡醒后失灵时用）\n");
 }
 
 int main(int argc, char **argv) {

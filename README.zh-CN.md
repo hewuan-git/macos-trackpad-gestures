@@ -156,7 +156,12 @@ clang -O2 -fblocks -Wall -Wno-deprecated-declarations -o trackpad-media main.c \
   rm ~/Library/Application\ Support/trackpad-media/run.log
   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.trackpad-media.plist
   ```
-- **远程自检**：`kill -USR1 <pid>` 发一次"音量减"再自动还原，用来客观确认媒体键真的能发出去；`kill -USR2 <pid>` 轮换闸门方式。
+- **远程自检**：`kill -USR1 <pid>` 发一次"音量减"再自动还原，用来客观确认媒体键真的能发出去；`kill -USR2 <pid>` 轮换闸门方式；`kill -WINCH <pid>` 不重启进程就重新订阅一次触摸板（也不会把授权弄没）。
+- **睡一觉回来手势就不灵了**：这是长时间常驻真会踩到的坑。以前进程还活着、授权也还在，但睡眠唤醒后触摸板订阅成了空壳，划什么都没反应，还不报错。v1.1 起会监听 `IOPMrootDomain` 的 `kIOMessageSystemHasPoweredOn`，收到就重新枚举、重新订阅，每秒试一次直到又收到手指数据。老版本遇到这件事一条命令就能救活、且不会作废授权：
+  ```sh
+  launchctl kickstart -k gui/$(id -u)/com.user.trackpad-media
+  ```
+  判断到底是哪一层坏了就看日志：`tail ~/Library/Application\ Support/trackpad-media/run.log`，手势只要被识别就一定有一行；**划了却一行都不出**就是订阅断了，不是授权的问题。
 - **网易云音乐不响应 MediaRemote**：它出声的时候系统查 `NowPlaying` 依然是空的，所以默认用模拟硬件媒体键（`--track key`）。用 `--track mr` 在这类 App 上会没反应。
 - **`--gate audio` 判"正在出声"**：读 CoreAudio 的进程对象列表，逐个看是否正在往输出设备送数据。不要用 `kAudioDevicePropertyDeviceIsRunningSomewhere`，那个只要有程序占用输出设备就返回真，闲置也算。
 
