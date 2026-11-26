@@ -32,6 +32,8 @@ open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibil
 
 上手前请先看「一定要先把系统手势挪开」，这是最容易踩的坑。
 
+**请用 v1.1 或更新。** v1.0 睡一觉之后触摸板订阅会失效：进程还在、授权也仍然显示"已允许"，但再也收不到手指数据，所以用几天手势就静默失灵，而且哪里都不报错。升级就好（`brew upgrade trackpad-media`，或重跑 `./install.sh`）；[v1.1 的 Release 说明](https://github.com/hewuan-git/macos-trackpad-gestures/releases/tag/v1.1)写了这件事是怎么排查出来的。只要重新编译，授权就会作废一次，需要重新添加——见下面「必须手动授权一次」。
+
 ## 为什么自己写
 
 Windows 上这套手势是现成的——精确式触摸板和 ASUS / Lenovo 这类厂商驱动里，多指左右滑切歌、上下滑调音量、点一下播放暂停都默认就有（各家默认指头数和方向不完全一样），用惯了回到 Mac 上就很别扭。Mac 端系统只提供"三指/四指轻扫切换全屏 App、调度中心"这类窗口手势，媒体控制得靠第三方；试过的几个要么收费、要么得挂一个带界面的 App、要么要装 Lua 运行时，都不合用，就自己写了一个。

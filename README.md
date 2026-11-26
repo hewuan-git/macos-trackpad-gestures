@@ -32,6 +32,8 @@ That last step only opens the settings page; you still have to flip the switch y
 
 Read "Move the system gestures out of the way first" before you try anything — it is the easiest thing to get wrong.
 
+**Use v1.1 or newer.** v1.0 loses its trackpad subscription after a sleep/wake cycle: the process stays alive, the permission still reads as granted, but contact frames stop arriving — so gestures silently die a few days in, with no error anywhere. Upgrading fixes it (`brew upgrade trackpad-media`, or re-run `./install.sh`); [the v1.1 release notes](https://github.com/hewuan-git/macos-trackpad-gestures/releases/tag/v1.1) document how it was diagnosed. Any rebuild costs you one re-grant of the permission — see "One permission you must grant by hand".
+
 ## Why write this at all
 
 On Windows these gestures come with the machine: Precision Touchpad and the ASUS / Lenovo vendor drivers ship multi-finger sideways swipe for track switching, vertical swipe for volume, and a tap for play/pause (the finger count and directions differ by vendor). Coming back to macOS feels clumsy: the system only offers window gestures — "three/four-finger swipe to switch full-screen apps, Mission Control" — and media control is left to third-party tools. The ones I tried were either paid, or insisted on keeping a GUI app running, or needed a Lua runtime. None of them fit, so I wrote this.

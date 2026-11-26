@@ -66,7 +66,7 @@ else
     <key>CFBundleIdentifier</key><string>com.local.trackpad-media</string>
     <key>CFBundleName</key><string>Trackpad Media</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>1.0</string>
+    <key>CFBundleShortVersionString</key><string>1.1</string>
     <key>LSUIElement</key><true/>
 </dict>
 </plist>
